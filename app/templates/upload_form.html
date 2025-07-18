@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Corvi</title>
+    <meta name="title" content="Hyperparameter Optimization">
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f8f9fa;
+            color: #212529;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 700px;
+            margin: 40px auto;
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+
+        h1 {
+            color: #0d6efd;
+            margin-bottom: 30px;
+        }
+
+        form {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        label {
+            font-weight: bold;
+            margin: 15px 0 5px;
+            width: 100%;
+            text-align: center;
+        }
+
+        input[type="file"],
+        select {
+            padding: 8px;
+            margin-bottom: 16px;
+            border-radius: 4px;
+            border: 1px solid #ced4da;
+            width: 60%;
+            text-align: center;
+        }
+
+        input[type="submit"],
+        button {
+            background-color: #0d6efd;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+
+        input[type="submit"]:hover,
+        button:hover {
+            background-color: #0b5ed7;
+        }
+
+        .tooltip {
+            display: inline-block;
+            position: relative;
+            cursor: pointer;
+            margin-left: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            color: #0d6efd;
+            border: 1px solid #0d6efd;
+            border-radius: 50%;
+            width: 18px;
+            height: 18px;
+            text-align: center;
+            line-height: 16px;
+        }
+
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 300px;
+            background-color: #343a40;
+            color: #fff;
+            text-align: left;
+            padding: 8px;
+            border-radius: 6px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            transform: translateX(-50%);
+            opacity: 0;
+            transition: opacity 0.3s;
+            font-weight: normal;
+        }
+
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
+
+        .status-box {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 6px;
+            display: none;
+            text-align: center;
+        }
+
+        .info { background-color: #fff3cd; border: 1px solid #ffeeba; }
+        .success { background-color: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background-color: #f8d7da; border: 1px solid #f5c6cb; }
+
+        .advanced {
+            display: none;
+            margin-top: 20px;
+            border-top: 1px dashed #ccc;
+            padding-top: 15px;
+            width: 100%;
+        }
+
+        a {
+            color: #0d6efd;
+            text-decoration: none;
+        }
+
+        a:hover {
+            text-decoration: underline;
+        }
+    </style>
+    <script>
+        function pollStatus(taskId) {
+            const statusBox = document.getElementById("status-box");
+            const statusText = document.getElementById("status-text");
+            const downloadBox = document.getElementById("download-box");
+
+            if (!taskId) return;
+
+            statusBox.className = "status-box info";
+            statusBox.style.display = "block";
+            statusText.innerText = "Optimization in progress...";
+
+            const interval = setInterval(() => {
+                fetch(`/api/status/${taskId}`)
+                    .then(res => res.json())
+                    .then(data => {
+                        if (data.status === "completed") {
+                            clearInterval(interval);
+                            statusBox.className = "status-box success";
+                            statusText.innerText = "Optimization complete!";
+                            downloadBox.innerHTML = `<a href="${data.download_url}"><button>Download result</button></a>`;
+                        } else if (data.status === "error") {
+                            clearInterval(interval);
+                            statusBox.className = "status-box error";
+                            statusText.innerText = "Optimization failed due to an error.";
+                        }
+                    })
+                    .catch(err => {
+                        clearInterval(interval);
+                        statusBox.className = "status-box error";
+                        statusText.innerText = "Connection error while checking task status.";
+                        console.error("Polling error:", err);
+                    });
+            }, 3000);
+        }
+
+        function toggleAdvanced() {
+            const advancedDiv = document.getElementById("advanced-settings");
+            advancedDiv.style.display = advancedDiv.style.display === "none" ? "block" : "none";
+        }
+    </script>
+</head>
+<body onload="{% if task_id %}pollStatus('{{ task_id }}'){% endif %}">
+<div class="container">
+    <h1>Corvi</h1>
+    <h1>Hyperparameter Optimization</h1>
+
+    <form action="/optimize/" enctype="multipart/form-data" method="post">
+    <label for="model_file">
+        Model file
+        <span class="tooltip">?
+            <span class="tooltiptext">Python .py file. Must contain a class named MyModel with methods fit(X, y) and predict(X).</span>
+        </span>
+    </label>
+    <input type="file" name="model_file" id="model_file" required accept=".py">
+
+    <label for="data_file">
+        Dataset file
+        <span class="tooltip">?
+            <span class="tooltiptext">CSV file with input features and a column named 'target'.</span>
+        </span>
+    </label>
+    <input type="file" name="data_file" id="data_file" required>
+
+    <button type="button" onclick="toggleAdvanced()">Advanced Settings</button>
+
+    <div class="advanced" id="advanced-settings">
+        <label for="hyperparams_file">
+            Hyperparameters
+            <span class="tooltip">?
+                <span class="tooltiptext">JSON file with ranges for hyperparameters, e.g. {"learning_rate": [0.01, 0.1], "max_depth": [3, 5]}</span>
+            </span>
+        </label>
+        <input type="file" name="hyperparams_file" id="hyperparams_file" accept=".json">
+
+        <label for="metric">
+            Evaluation metric
+            <span class="tooltip">?
+                <span class="tooltiptext">Choose a metric to evaluate model performance, such as accuracy or F1 score.</span>
+            </span>
+        </label>
+        <select name="metric" id="metric">
+            <option value="accuracy">Accuracy</option>
+            <option value="f1">F1 Score</option>
+            <option value="roc_auc">ROC AUC</option>
+            <option value="precision">Precision</option>
+            <option value="recall">Recall</option>
+        </select>
+    </div>
+
+    <br>
+    <input type="submit" value="Start Optimization">
+</form>
+
+    {% if message %}
+        <p><strong>{{ message }}</strong></p>
+    {% endif %}
+
+    {% if task_id %}
+        <div id="status-box" class="status-box info">
+            <p id="status-text">Checking optimization status...</p>
+        </div>
+        <div id="download-box" style="margin-top: 15px;"></div>
+    {% endif %}
+</div>
+</body>
+</html>

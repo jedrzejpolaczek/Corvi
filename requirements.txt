@@ -1,0 +1,8 @@
+fastapi
+uvicorn
+jinja2
+celery
+redis
+optuna
+pandas
+python-multipart
