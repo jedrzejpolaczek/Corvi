@@ -6,3 +6,7 @@ redis
 optuna
 pandas
 python-multipart
+scikit-learn
+xgboost
+psutil
+gputil
